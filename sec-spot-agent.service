@@ -1,0 +1,13 @@
+[Unit]
+Description=Sec-Spot Monitoring Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/sec-spot/agent.py
+WorkingDirectory=/usr/sec-spot
+Restart=always
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
