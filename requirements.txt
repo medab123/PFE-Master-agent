@@ -1,0 +1,8 @@
+socket
+time
+multiprocessing
+sqlite3
+python-dotenv
+psutil
+scapy
+struct

@@ -1,2 +1,18 @@
-/resource/__pycache__
-/test.py
+# Python-related
+*.pyc
+__pycache__/
+
+# Environment files
+*.env
+config.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor files
+.vscode/
+.idea/
+
+# Other
+test.py

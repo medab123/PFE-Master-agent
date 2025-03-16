@@ -1,7 +1,7 @@
+import asyncio
 import psutil
-import pickle
-import struct
 import sqlite3
+from datetime import datetime
 
 
 class UserActivityMonitoring:
@@ -34,18 +34,7 @@ class UserActivityMonitoring:
         for process in running_processes[:5]:  # Show top 5 processes
             print(f"  PID: {process['pid']}, Name: {process['name']}, CPU: {process['cpu_percent']}%, Memory: {process['memory_percent']}%")
 
-    def sync_with_server(self, server_socket):
-        """Synchronize user activity metrics with the remote server."""
-        metrics = {
-            "logged_in_users": self.get_logged_in_users(),
-            "running_processes": self.get_running_processes()
-        }
-        serialized_data = pickle.dumps({"type": "user_activity", "data": metrics})
-        length = len(serialized_data)
-        server_socket.sendall(struct.pack('!I', length))  # Send length
-        server_socket.sendall(serialized_data)           # Send serialized data
-        print("Data sent successfully.")
-
+   
     def write_to_database(self, db_connection):
         """Write user activity data into an SQLite database."""
         cursor = db_connection.cursor()
@@ -104,3 +93,30 @@ class UserActivityMonitoring:
         # Commit the transaction
         db_connection.commit()
         print("Data written to database successfully.")
+
+    def prepare_user_activity_data(self):
+        """Prepare the user activity data to send to the server."""
+        logged_in_users = self.get_logged_in_users()
+        running_processes = self.get_running_processes()
+
+        data = {
+            "logged_in_users": logged_in_users,
+            "running_processes": running_processes,
+        }
+        return data
+
+    async def start(self, client, sleep_time=5, batch_size=10):
+        """Start monitoring user activity and sending data to the server periodically."""
+        while True:
+            print("Starting user activity monitoring...")
+            
+            # Prepare the user activity data
+            user_activity_data = self.prepare_user_activity_data()
+
+            # Send the data directly to the server (WebSocket)
+            await client.send('user-activity', user_activity_data)
+            
+            print(f"User activity data sent to server at {datetime.now()}.")
+
+            # Sleep for the specified interval before the next monitoring cycle
+            await asyncio.sleep(sleep_time)

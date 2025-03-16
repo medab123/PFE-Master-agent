@@ -5,69 +5,65 @@ import socket
 import time
 from multiprocessing import Process
 import sqlite3
+from dotenv import load_dotenv
+import os
+import asyncio
 
-server_ip = "0.0.0.0"
-server_port = 3000
+from services.reverb import WebSocketClient
+
+
+
 sleep_time = 3
-def connect():
-    """Create a connection to the server."""
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.connect((server_ip, server_port))
-    return server_socket
+sync_sleep_time = 3
 
-def sync_resource(connection):
-    """Sync resource metrics with the server."""
-    resource_monitor = ResourceMonitoring()
-    while True:
-        resource_monitor.sync_with_server(connection)
-        time.sleep(sleep_time)  # Adjust interval as needed
 
-def sync_traffic(connection):
-    """Sync traffic metrics with the server."""
-    traffic_monitor = TrafficMonitoring()
-    while True:
-        traffic_monitor.sync_traffic_with_server(connection, packet_range=20)
-        time.sleep(sleep_time)  # Adjust interval as needed
+def subscribe_agent(client, db_connection):
+    cursor = db_connection.cursor()
 
-def sync_user_activity(connection):
-    """Sync user activity metrics with the server."""
-    user_activity_monitor = UserActivityMonitoring()
-    while True:
-        user_activity_monitor.sync_with_server(connection)
-        time.sleep(sleep_time)  # Adjust interval as needed
+    cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscribed INTEGER DEFAULT 0
+            )
+        ''')
+    
+    cursor.execute('SELECT subscribed FROM settings WHERE id = 1')
+    result = cursor.fetchone()
+    
+    if result is None:
+        cursor.execute('INSERT INTO settings (subscribed) VALUES (0)')
+        db_connection.commit()
+        result = (0,)
+    
+    if result[0] == 0:
+        print("Not subscribed. Sending subscription event.")
+        
+        client.send("subscribe", {})
+        cursor.execute('UPDATE settings SET subscribed = 1 WHERE id = 1')
+        db_connection.commit()
+        print("Subscription successful. Database updated.")
+    else:
+        print("Already subscribed. No action needed.")
+
+
+    
+async def main():
+    db_path = 'database.db' 
+    client = await WebSocketClient()._connect()
+    if client.websocket is None:
+        raise Exception("Failed to connect to the WebSocket server")
+    
+    db_connection = sqlite3.connect(db_path)
+    subscribe_agent(client=client, db_connection=db_connection)
+    db_connection.close()
+    await asyncio.gather(
+        ResourceMonitoring().start(client=client, sleep_time=1, batch_size=1),
+        TrafficMonitoring().start(client=client, sleep_time=1, batch_size=1),
+        #UserActivityMonitoring().start(client=client, sleep_time=1, batch_size=1)
+    )
+
+
 
 if __name__ == "__main__":
-    db_connection = sqlite3.connect('database.db')
-    
-    # Display initial metrics
-    resource_monitoring = ResourceMonitoring()
-    resource_monitoring.save_metrics_to_database(db_connection)
-    user_activity_monitoring = UserActivityMonitoring()
-    user_activity_monitoring.write_to_database(db_connection)
 
-
-    traffic_monitor = TrafficMonitoring()
-    # Capture and save network traffic to the database
-    traffic_monitor.save_traffic_to_database(db_connection)
-    db_connection.close()
-    # resource_monitoring.display_metrics()
-    # user_activity_monitoring.display_user_activity()
-
-    # Establish connections for each process
-    # resource_connection = connect()
-    # traffic_connection = connect()
-    # user_activity_connection = connect()
-
-    # Create and start processes
-    # resource_process = Process(target=sync_resource, args=(resource_connection,))
-    # traffic_process = Process(target=sync_traffic, args=(traffic_connection,))
-    # user_activity_process = Process(target=sync_user_activity, args=(user_activity_connection,))
-
-    # resource_process.start()
-    # traffic_process.start()
-    # user_activity_process.start()
-
-    # Wait for processes to complete (optional, unless you need blocking)
-    # resource_process.join()
-    # traffic_process.join()
-    # user_activity_process.join()
+    asyncio.run(main())
