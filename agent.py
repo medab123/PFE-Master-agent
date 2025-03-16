@@ -17,28 +17,29 @@ sleep_time = 3
 sync_sleep_time = 3
 
 
-def subscribe_agent(client, db_connection):
+async def subscribe_agent(client, db_connection):
     cursor = db_connection.cursor()
 
-    cursor.execute('''
-            CREATE TABLE IF NOT EXISTS settings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                subscribed INTEGER DEFAULT 0
-            )
-        ''')
-    
+    cursor.execute(''' 
+        CREATE TABLE IF NOT EXISTS settings ( 
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            subscribed INTEGER DEFAULT 0 
+        ) 
+    ''')
+
     cursor.execute('SELECT subscribed FROM settings WHERE id = 1')
     result = cursor.fetchone()
-    
+
     if result is None:
         cursor.execute('INSERT INTO settings (subscribed) VALUES (0)')
         db_connection.commit()
         result = (0,)
-    
+
     if result[0] == 0:
         print("Not subscribed. Sending subscription event.")
         
-        client.send("subscribe", {})
+        # Await the send call here
+        await client.send("subscribe", {})
         cursor.execute('UPDATE settings SET subscribed = 1 WHERE id = 1')
         db_connection.commit()
         print("Subscription successful. Database updated.")
@@ -54,7 +55,7 @@ async def main():
         raise Exception("Failed to connect to the WebSocket server")
     
     db_connection = sqlite3.connect(db_path)
-    subscribe_agent(client=client, db_connection=db_connection)
+    await subscribe_agent(client=client, db_connection=db_connection)
     db_connection.close()
     await asyncio.gather(
         ResourceMonitoring().start(client=client, sleep_time=1, batch_size=1),
