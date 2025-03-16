@@ -39,7 +39,7 @@ async def subscribe_agent(client, db_connection):
         print("Not subscribed. Sending subscription event.")
         
         # Await the send call here
-        await client.send("subscribe", {})
+        await client.send("subscribe", {'action':'subscribe'})
         cursor.execute('UPDATE settings SET subscribed = 1 WHERE id = 1')
         db_connection.commit()
         print("Subscription successful. Database updated.")
