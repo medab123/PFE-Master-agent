@@ -36,9 +36,15 @@ class TrafficMonitoring:
         """Start capturing network traffic and send data to the server periodically in batches."""
         while True:
             batch_data = []
-            for _ in range(batch_size):
-                packets = self.capture_traffic(packet_count=1)  
-                batch_data.extend(packets) 
-            await client.send('network-traffic', batch_data)
-            print(f"{len(batch_data)} packets sent to server.")
+            try:
+                for _ in range(batch_size):
+                    packets = self.capture_traffic(packet_count=1)  # Capture one packet
+                    batch_data.extend(packets)  # Add packets to the batch data
+                await client.send('network-traffic', batch_data)  # Send the batch data to the server
+
+                print(f"{len(batch_data)} packets sent to server.")
+            except Exception as e:
+                print(f"Error occurred while capturing or sending network traffic: {e}")
+
+            # Wait before capturing the next batch of packets
             await asyncio.sleep(sleep_time)

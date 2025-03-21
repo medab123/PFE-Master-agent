@@ -77,26 +77,33 @@ class ResourceMonitoring:
         """Start monitoring system resources and send data to the server periodically in batches."""
         while True:
             batch_data = []
-            for _ in range(batch_size):
-                cpu_metrics = self.get_cpu_usage()
-                ram_metrics = self.get_ram_usage()
-                rom_metrics = self.get_rom_usage()
-                network_metrics = self.get_network_traffic()
-                data = {
-                    'cpu_usage_percent': cpu_metrics['cpu_usage_percent'],
-                    'ram_total': ram_metrics['ram_total'],
-                    'ram_used': ram_metrics['ram_used'],
-                    'ram_available': ram_metrics['ram_available'],
-                    'rom_total': rom_metrics['rom_total'],
-                    'rom_used': rom_metrics['rom_used'],
-                    'rom_free': rom_metrics['rom_free'],
-                    'bytes_sent': network_metrics['bytes_sent'],
-                    'bytes_received': network_metrics['bytes_received'],
-                    'packets_sent': network_metrics['packets_sent'],
-                    'packets_received': network_metrics['packets_received'],
-                }
-                batch_data.append(data)
-            await client.send('resource-monitoring', batch_data)
+            try:
+                for _ in range(batch_size):
+                    cpu_metrics = self.get_cpu_usage()
+                    ram_metrics = self.get_ram_usage()
+                    rom_metrics = self.get_rom_usage()
+                    network_metrics = self.get_network_traffic()
 
-            print(f"{batch_size} metrics sent to server.")
+                    data = {
+                        'cpu_usage_percent': cpu_metrics['cpu_usage_percent'],
+                        'ram_total': ram_metrics['ram_total'],
+                        'ram_used': ram_metrics['ram_used'],
+                        'ram_available': ram_metrics['ram_available'],
+                        'rom_total': rom_metrics['rom_total'],
+                        'rom_used': rom_metrics['rom_used'],
+                        'rom_free': rom_metrics['rom_free'],
+                        'bytes_sent': network_metrics['bytes_sent'],
+                        'bytes_received': network_metrics['bytes_received'],
+                        'packets_sent': network_metrics['packets_sent'],
+                        'packets_received': network_metrics['packets_received'],
+                    }
+                    batch_data.append(data)
+
+                await client.send('resource-monitoring', batch_data)
+
+                print(f"{batch_size} metrics sent to server.")
+            except Exception as e:
+                print(f"Error occurred while collecting or sending data: {e}")
+
+            # Wait before sending the next batch
             await asyncio.sleep(sleep_time)
