@@ -8,6 +8,8 @@ WorkingDirectory=/usr/sec-spot
 Restart=always
 User=root
 Group=root
+StandardOutput=append:/var/log/sec-spot.log
+StandardError=append:/var/log/sec-spot.log
 
 [Install]
 WantedBy=multi-user.target
