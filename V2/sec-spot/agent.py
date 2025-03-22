@@ -39,6 +39,7 @@ class Agent:
             self.ws_client = WebSocketClient(
                 uri=self.settings.REVERB_URI,
                 server_id=self.settings.SERVER_ID,
+                channel=self.settings.REVERB_CHANNEL,
                 agent_version=self.settings.AGENT_VERSION,
                 retries=self.settings.RETRIES
             )

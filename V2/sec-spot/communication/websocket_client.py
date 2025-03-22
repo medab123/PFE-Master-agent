@@ -15,7 +15,7 @@ logger = logging.getLogger('sec-spot-agent.websocket')
 class WebSocketClient:
     """Client for WebSocket communication with the server"""
     
-    def __init__(self, uri, server_id, agent_version, retries=3):
+    def __init__(self, uri, server_id,channel,agent_version, retries=3):
         """Initialize WebSocket client
         
         Args:
@@ -28,7 +28,9 @@ class WebSocketClient:
         self.server_id = server_id
         self.agent_version = agent_version
         self.max_retries = retries
-        
+
+        self.channel = channel
+
         self.ws = None
         self.connected = False
         self.retry_count = 0
@@ -163,6 +165,7 @@ class WebSocketClient:
             message = {
                 'event': event,
                 'server_id': self.server_id,
+                'channel': self.channel,
                 'agent_version': self.agent_version,
                 'data': data
             }
@@ -179,6 +182,7 @@ class WebSocketClient:
         try:
             message = {
                 'event': 'agent.subscribe',
+                'channel':self.channel,
                 'server_id': self.server_id,
                 'agent_version': self.agent_version,
                 'hostname': self.hostname,
