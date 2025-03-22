@@ -1,0 +1,23 @@
+# Core dependencies
+psutil>=5.9.0       # System metrics collection
+websocket-client>=1.3.1  # WebSocket communication
+requests>=2.27.1    # HTTP requests
+python-dotenv>=0.20.0  # Environment variable management
+
+# Network monitoring
+scapy>=2.4.5        # Network packet analysis
+netifaces>=0.11.0   # Network interface information
+
+# Security and analysis
+pyOpenSSL>=22.0.0   # SSL/TLS toolkit
+cryptography>=37.0.0  # Cryptographic primitives
+pyjwt>=2.4.0        # JSON Web Tokens
+
+# System tools
+distro>=1.7.0       # OS distribution detection
+setproctitle>=1.2.3  # Process title customization
+
+# Utilities
+schedule>=1.1.0     # Job scheduling
+humanize>=4.1.0     # Human-readable data formats
+python-dateutil>=2.8.2  # Date utilities
