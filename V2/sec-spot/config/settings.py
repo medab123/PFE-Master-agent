@@ -12,8 +12,8 @@ class Settings:
         self.SERVER_ID = os.getenv('SERVER_ID')
         self.REVERB_URI = os.getenv('REVERB_URI')
         self.REVERB_CHANNEL = os.getenv('REVERB_CHANNEL')
-        self.AGENT_VERSION = os.getenv('AGENT_VERSION', '1.0.0')
-        self.MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '60'))  # seconds
+        self.AGENT_VERSION = os.getenv('AGENT_VERSION', '2.0.0')
+        self.MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '20'))  # seconds
         self.RETRIES = int(os.getenv('RETRIES', '3'))
         self.LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
         self.SEND_ALL_LOGS = os.getenv('LOG_LEVEL', False),

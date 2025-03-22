@@ -52,11 +52,11 @@ class Agent:
             )
             self.security_collector = SecurityCollector(
                 callback=self.on_security_events_collected,
-                check_interval=300  # 5 minutes
+                check_interval= self.settings.MONITORING_INTERVAL  # 5 minutes
             )
             self.log_collector = LogCollector(
                 callback=self.on_logs_collected,
-                check_interval=120  # 2 minutes
+                check_interval= self.settings.MONITORING_INTERVAL  # 2 minutes
             )
             
             # Initialize analyzers
@@ -168,12 +168,6 @@ class Agent:
             
             # Analyze metrics for anomalies
             analysis = self.metrics_analyzer.analyze(metrics)
-            
-            # Combine metrics and analysis
-            data = {
-                "metrics": metrics,
-                "analysis": analysis
-            }
             
             # Send metrics to server
             success = self.ws_client.send_message('agent.resource-monitoring', [metrics])

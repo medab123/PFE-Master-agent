@@ -188,7 +188,8 @@ class WebSocketClient:
                 'hostname': self.hostname,
                 'platform': self.platform,
                 'platform_version': self.platform_version,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'data':[{'event': 'agent.subscribe'}]
             }
             
             self.ws.send(json.dumps(message))
