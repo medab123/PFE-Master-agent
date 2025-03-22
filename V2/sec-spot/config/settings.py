@@ -16,6 +16,7 @@ class Settings:
         self.MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '60'))  # seconds
         self.RETRIES = int(os.getenv('RETRIES', '3'))
         self.LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+        self.SEND_ALL_LOGS = os.getenv('LOG_LEVEL', False),
         
         # System information
         self.HOSTNAME = socket.gethostname()
