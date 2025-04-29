@@ -237,38 +237,14 @@ class Agent:
         if not log_entries or not log_entries.get('entries'):
             return True
         
-        try:
-            # Only send logs with errors or warnings, or if specifically configured
-            if (log_entries.get('has_errors', False) or 
-                log_entries.get('has_warnings', False) or 
-                self.settings.SEND_ALL_LOGS):
+        try:  
+            success = self.ws_client.send_message('agent.logs', log_entries)
+            if success:
+                logger.info(f"Log entries sent successfully ({len(log_entries['entries'])} entries)")
+            else:
+                logger.error("Failed to send log entries")
                 
-                success = self.ws_client.send_message('agent.logs', log_entries)
-                if success:
-                    logger.info(f"Log entries sent successfully ({len(log_entries['entries'])} entries)")
-                else:
-                    logger.error("Failed to send log entries")
-                
-                # If there are errors, send an alert
-                if log_entries.get('has_errors', False):
-                    error_entries = [e for e in log_entries['entries'] if e['severity'] == 'error']
-                    
-                    alert_data = {
-                        "alert_type": "log",
-                        "errors": error_entries[:10],  # First 10 errors
-                        "error_count": len(error_entries),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    
-                    success = self.ws_client.send_message('agent.alert', alert_data)
-                    if success:
-                        logger.info(f"Sent alert for {len(error_entries)} log errors")
-                    else:
-                        logger.error("Failed to send log alert")
-                
-                return success
-            
-            return True
+            return success
         
         except Exception as e:
             logger.error(f"Error processing log entries: {str(e)}")

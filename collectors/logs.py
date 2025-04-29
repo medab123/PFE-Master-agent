@@ -260,15 +260,6 @@ class LogCollector:
                 time_since_last_batch = (current_time - self.last_batch_time).total_seconds()
                 
                 if (time_since_last_batch >= batch_interval and collected_entries['entries']) or len(collected_entries['entries']) > 100:
-                    # Set flags based on content
-                    has_errors = collected_entries['stats']['by_severity']['error'] > 0
-                    has_warnings = collected_entries['stats']['by_severity']['warning'] > 0
-                    
-                    collected_entries['has_errors'] = has_errors
-                    collected_entries['has_warnings'] = has_warnings
-                    collected_entries['importance'] = 'high' if has_errors else ('medium' if has_warnings else 'low')
-                    
-                    # If we have entries and a callback, send them
                     if collected_entries['entries'] and self.callback:
                         logger.info(f"Sending {len(collected_entries['entries'])} log entries")
                         self.callback(collected_entries)
