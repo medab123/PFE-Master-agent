@@ -1,6 +1,7 @@
 [Unit]
     Description=Sec-Spot Monitoring Agent
     After=network.target
+    Wants=network-online.target
 
 [Service]
     ExecStart=/usr/bin/python3 /usr/sec-spot/agent.py
@@ -11,5 +12,16 @@
     StandardOutput=append:/var/log/sec-spot.log
     StandardError=append:/var/log/sec-spot.log
 
+    # Hardening options
+    PrivateTmp=true
+    ProtectSystem=full
+    ReadWritePaths=/usr/sec-spot
+    ProtectHome=true
+    ProtectControlGroups=true
+    ProtectKernelModules=true
+    ProtectKernelTunables=true
+    RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+    MemoryDenyWriteExecute=true
+    RestrictRealtime=true
 [Install]
     WantedBy=multi-user.target
