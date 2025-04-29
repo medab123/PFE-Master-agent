@@ -21,4 +21,4 @@ setproctitle>=1.2.3  # Process title customization
 schedule>=1.1.0     # Job scheduling
 humanize>=4.1.0     # Human-readable data formats
 python-dateutil>=2.8.2  # Date utilities
-pyinotify==0.9.6
+watchdog>=2.1.9     # File system monitoring (cross-platform)

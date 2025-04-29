@@ -6,8 +6,9 @@ import threading
 import time
 from datetime import datetime
 from collections import defaultdict
-import pyinotify
 import queue
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 logger = logging.getLogger('sec-spot-agent.logs')
 
@@ -27,6 +28,7 @@ class LogCollector:
         self.collector_thread = None
         self.monitor_thread = None
         self.log_queue = queue.Queue()
+        self.observer = None
         
         # Common log files to monitor
         self.log_files = [
@@ -140,6 +142,11 @@ class LogCollector:
         """Stop log collection"""
         self.stop_collecting.set()
         
+        # Stop the observer if it's running
+        if self.observer:
+            self.observer.stop()
+            self.observer.join(timeout=2)
+        
         if self.collector_thread and self.collector_thread.is_alive():
             self.collector_thread.join(timeout=2)
         
@@ -159,44 +166,45 @@ class LogCollector:
                 logger.error(f"Error reading log file {log_file['path']}: {str(e)}")
     
     def _monitor_log_files(self):
-        """Monitor log files for changes using inotify"""
+        """Monitor log files for changes using watchdog"""
         try:
-            # Set up the WatchManager and EventHandler
-            wm = pyinotify.WatchManager()
-            
-            class LogEventHandler(pyinotify.ProcessEvent):
+            # Create a file event handler
+            class LogEventHandler(FileSystemEventHandler):
                 def __init__(self, collector):
                     self.collector = collector
                 
-                def process_IN_MODIFY(self, event):
-                    # When a file is modified, add it to the queue
-                    if event.pathname in self.collector.file_metadata:
-                        self.collector.log_queue.put(event.pathname)
+                def on_modified(self, event):
+                    if not event.is_directory and event.src_path in self.collector.file_metadata:
+                        self.collector.log_queue.put(event.src_path)
             
             # Create the event handler
-            handler = LogEventHandler(self)
+            event_handler = LogEventHandler(self)
             
-            # Set up the notifier
-            notifier = pyinotify.Notifier(wm, handler)
+            # Create the observer
+            self.observer = Observer()
             
-            # Add watches for all log files
+            # Get unique directories to watch
+            watched_dirs = set()
             for log_file in self.log_files:
+                watched_dirs.add(os.path.dirname(log_file['path']))
+            
+            # Schedule the observer to watch each directory
+            for directory in watched_dirs:
                 try:
-                    wm.add_watch(log_file['path'], pyinotify.IN_MODIFY)
+                    self.observer.schedule(event_handler, directory, recursive=False)
                 except Exception as e:
-                    logger.error(f"Error adding watch for {log_file['path']}: {str(e)}")
+                    logger.error(f"Error scheduling watch for directory {directory}: {str(e)}")
             
-            # Start the event loop
-            logger.info("Starting inotify event loop")
+            # Start the observer
+            self.observer.start()
+            logger.info("Watchdog observer started")
+            
+            # Keep the thread alive until stop_collecting is set
             while not self.stop_collecting.is_set():
-                # Process events for 1 second, then check if we should stop
-                if notifier.check_events(timeout=1000):
-                    notifier.read_events()
-                    notifier.process_events()
+                time.sleep(1)
             
-            # Clean up
-            notifier.stop()
-            logger.info("Inotify event loop stopped")
+            # Observer will be stopped in the stop() method
+            logger.info("Watchdog monitoring stopped")
             
         except Exception as e:
             logger.error(f"Error in file monitoring: {str(e)}")
