@@ -15,12 +15,13 @@ logger = logging.getLogger('sec-spot-agent.logs')
 class LogCollector:
     """Collector for system logs and application logs using real-time monitoring"""
     
-    def __init__(self, callback=None, check_interval=60):
+    def __init__(self, callback=None, check_interval=60, exclude_logs=None):
         """Initialize the log collector
-        
+
         Args:
             callback (callable): Function to call when logs are collected
             check_interval (int): Interval between log checks in seconds (fallback)
+            exclude_logs (list): List of log files to exclude from monitoring
         """
         self.callback = callback
         self.check_interval = check_interval
@@ -29,24 +30,27 @@ class LogCollector:
         self.monitor_thread = None
         self.log_queue = queue.Queue()
         self.observer = None
-        
-        # Common log files to monitor
+
+        # List of log files to exclude from monitoring
+        self.exclude_logs = exclude_logs or [
+            # Add default exclusions here
+            '/var/log/sec-spot.log',
+            '/var/log/sec-spot-agent.log',
+        ]
+
         # Dynamically discover all files in /var/log
         self.log_files = []
         self._discover_log_files('/var/log')
-        
-        # Filter to existing log files only
-        self.log_files = [log for log in self.log_files if os.path.exists(log['path'])]
-        
+
         # Create a mapping from file path to file metadata
         self.file_metadata = {log['path']: log for log in self.log_files}
-        
+
         # Last read positions for each log file
         self.log_positions = {log['path']: 0 for log in self.log_files}
-        
+
         # Time of last batch send
         self.last_batch_time = datetime.now()
-        
+
         # Log patterns to classify importance
         self.log_patterns = {
             'error': [
@@ -68,17 +72,70 @@ class LogCollector:
                 r'\bcompleted\b'
             ]
         }
-        
+
         logger.info(f"Log collector initialized with {len(self.log_files)} log files")
+        logger.info(f"Excluded {len(self.exclude_logs)} log files from monitoring")
+
+        # Log discovered files with their types
         logger.info("Discovered log files:")
         log_types = defaultdict(list)
         for log_file in self.log_files:
             log_types[log_file['type']].append(log_file['path'])
-        
-        for log_type, files in log_types.items():
+
+        for log_type, files in sorted(log_types.items()):
             logger.info(f"  {log_type} logs ({len(files)}):")
-            for file_path in files:
+            for file_path in sorted(files):
                 logger.info(f"    - {file_path}")
+
+    def _discover_log_files(self, root_dir):
+        """Recursively discover all log files in the given directory
+        
+        Args:
+            root_dir (str): Root directory to scan
+        """
+        try:
+            for entry in os.listdir(root_dir):
+                path = os.path.join(root_dir, entry)
+                
+                # Skip if the path is in the exclude list
+                if path in self.exclude_logs:
+                    logger.debug(f"Skipping excluded log file: {path}")
+                    continue
+                    
+                # Skip if the path matches any pattern in the exclude list
+                if any(path.startswith(exclude) or 
+                    (exclude.endswith('*') and path.startswith(exclude[:-1])) for exclude in self.exclude_logs):
+                    logger.debug(f"Skipping excluded log file (pattern match): {path}")
+                    continue
+                
+                # Skip symlinks that point outside /var/log to prevent loops
+                if os.path.islink(path):
+                    real_path = os.path.realpath(path)
+                    if not real_path.startswith('/var/log'):
+                        continue
+                
+                if os.path.isdir(path):
+                    # Recursively scan subdirectories
+                    self._discover_log_files(path)
+                elif os.path.isfile(path):
+                    # Check if file is readable and not empty
+                    try:
+                        if os.path.getsize(path) > 0 and os.access(path, os.R_OK):
+                            # Determine log type based on directory or filename
+                            log_type = self._determine_log_type(path)
+                            
+                            # Add to log files list
+                            self.log_files.append({
+                                'path': path,
+                                'type': log_type
+                            })
+                    except (OSError, PermissionError) as e:
+                        logger.warning(f"Cannot access file {path}: {str(e)}")
+        except PermissionError:
+            logger.warning(f"Permission denied for {root_dir}")
+        except Exception as e:
+            logger.error(f"Error scanning directory {root_dir}: {str(e)}")
+            
     def start(self):
         """Start log collection using real-time file monitoring"""
         if self.collector_thread and self.collector_thread.is_alive():
@@ -339,40 +396,6 @@ class LogCollector:
         
         # This will just trigger processing, actual collection is done in _process_log_queue
         return None
-
-    
-    def _discover_log_files(self, root_dir):
-        """Recursively discover all log files in the given directory
-        
-        Args:
-            root_dir (str): Root directory to scan
-        """
-        try:
-            for entry in os.listdir(root_dir):
-                path = os.path.join(root_dir, entry)
-                
-                # Skip symlinks that point outside /var/log to prevent loops
-                if os.path.islink(path):
-                    real_path = os.path.realpath(path)
-                    if not real_path.startswith('/var/log'):
-                        continue
-                
-                if os.path.isdir(path):
-                    # Recursively scan subdirectories
-                    self._discover_log_files(path)
-                elif os.path.isfile(path):
-                    # Determine log type based on directory or filename
-                    log_type = self._determine_log_type(path)
-                    
-                    # Add to log files list
-                    self.log_files.append({
-                        'path': path,
-                        'type': log_type
-                    })
-        except PermissionError:
-            logger.warning(f"Permission denied for {root_dir}")
-        except Exception as e:
-            logger.error(f"Error scanning directory {root_dir}: {str(e)}")
 
     def _determine_log_type(self, path):
         """Determine the type of log based on path and filename
