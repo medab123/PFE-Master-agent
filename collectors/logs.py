@@ -31,53 +31,9 @@ class LogCollector:
         self.observer = None
         
         # Common log files to monitor
-        self.log_files = [
-            # System logs
-            {'path': '/var/log/syslog', 'type': 'system'},
-            {'path': '/var/log/messages', 'type': 'system'},
-            {'path': '/var/log/dmesg', 'type': 'system'},
-
-            # Authentication logs
-            {'path': '/var/log/auth.log', 'type': 'auth'},
-            {'path': '/var/log/secure', 'type': 'auth'},
-            {'path': '/var/log/faillog', 'type': 'auth'},
-
-            # Web server logs
-            {'path': '/var/log/apache2/access.log', 'type': 'web'},
-            {'path': '/var/log/apache2/error.log', 'type': 'web'},
-            {'path': '/var/log/nginx/access.log', 'type': 'web'},
-            {'path': '/var/log/nginx/error.log', 'type': 'web'},
-
-            # Database logs
-            {'path': '/var/log/mysql/error.log', 'type': 'database'},
-            {'path': '/var/log/mysql/mysql.log', 'type': 'database'},
-            {'path': '/var/log/postgresql/postgresql.log', 'type': 'database'},
-
-            # Docker
-            {'path': '/var/log/docker.log', 'type': 'container'},
-
-            # Cron
-            {'path': '/var/log/cron', 'type': 'scheduler'},
-            {'path': '/var/log/cron.log', 'type': 'scheduler'},
-
-            # Mail services
-            {'path': '/var/log/mail.log', 'type': 'mail'},
-            {'path': '/var/log/mail.err', 'type': 'mail'},
-
-            # Kernel
-            {'path': '/var/log/kern.log', 'type': 'kernel'},
-
-            # Firewall
-            {'path': '/var/log/ufw.log', 'type': 'firewall'},
-            {'path': '/var/log/firewalld', 'type': 'firewall'},
-
-            # Application-specific (optional based on use)
-            {'path': '/var/log/php7.4-fpm.log', 'type': 'app'},
-            {'path': '/var/log/php8.1-fpm.log', 'type': 'app'},
-            {'path': '/var/log/redis/redis-server.log', 'type': 'database'},
-            {'path': '/var/log/elasticsearch/elasticsearch.log', 'type': 'search'},
-            {'path': '/var/log/rsync.log', 'type': 'sync'},
-        ]
+        # Dynamically discover all files in /var/log
+        self.log_files = []
+        self._discover_log_files('/var/log')
         
         # Filter to existing log files only
         self.log_files = [log for log in self.log_files if os.path.exists(log['path'])]
@@ -114,7 +70,15 @@ class LogCollector:
         }
         
         logger.info(f"Log collector initialized with {len(self.log_files)} log files")
-
+        logger.info("Discovered log files:")
+        log_types = defaultdict(list)
+        for log_file in self.log_files:
+            log_types[log_file['type']].append(log_file['path'])
+        
+        for log_type, files in log_types.items():
+            logger.info(f"  {log_type} logs ({len(files)}):")
+            for file_path in files:
+                logger.info(f"    - {file_path}")
     def start(self):
         """Start log collection using real-time file monitoring"""
         if self.collector_thread and self.collector_thread.is_alive():
@@ -375,3 +339,79 @@ class LogCollector:
         
         # This will just trigger processing, actual collection is done in _process_log_queue
         return None
+
+    
+    def _discover_log_files(self, root_dir):
+        """Recursively discover all log files in the given directory
+        
+        Args:
+            root_dir (str): Root directory to scan
+        """
+        try:
+            for entry in os.listdir(root_dir):
+                path = os.path.join(root_dir, entry)
+                
+                # Skip symlinks that point outside /var/log to prevent loops
+                if os.path.islink(path):
+                    real_path = os.path.realpath(path)
+                    if not real_path.startswith('/var/log'):
+                        continue
+                
+                if os.path.isdir(path):
+                    # Recursively scan subdirectories
+                    self._discover_log_files(path)
+                elif os.path.isfile(path):
+                    # Determine log type based on directory or filename
+                    log_type = self._determine_log_type(path)
+                    
+                    # Add to log files list
+                    self.log_files.append({
+                        'path': path,
+                        'type': log_type
+                    })
+        except PermissionError:
+            logger.warning(f"Permission denied for {root_dir}")
+        except Exception as e:
+            logger.error(f"Error scanning directory {root_dir}: {str(e)}")
+
+    def _determine_log_type(self, path):
+        """Determine the type of log based on path and filename
+        
+        Args:
+            path (str): Path to the log file
+            
+        Returns:
+            str: Log type category
+        """
+        path_lower = path.lower()
+        filename = os.path.basename(path_lower)
+        dirname = os.path.dirname(path_lower)
+        
+        # Check directory names first
+        if '/apache' in dirname or '/httpd' in dirname or '/nginx' in dirname:
+            return 'web'
+        elif '/mysql' in dirname or '/postgresql' in dirname or '/mongo' in dirname:
+            return 'database'
+        elif '/mail' in dirname or '/postfix' in dirname or '/exim' in dirname:
+            return 'mail'
+        elif '/docker' in dirname or '/containers' in dirname or '/k8s' in dirname:
+            return 'container'
+        
+        # Then check filenames
+        if 'auth' in filename or 'secure' in filename or 'sshd' in filename:
+            return 'auth'
+        elif 'kern' in filename or 'dmesg' in filename:
+            return 'kernel'
+        elif 'cron' in filename:
+            return 'scheduler'
+        elif 'firewall' in filename or 'ufw' in filename or 'iptables' in filename:
+            return 'firewall'
+        elif 'syslog' in filename or 'messages' in filename:
+            return 'system'
+        
+        # Generic application logs based on common extensions
+        if filename.endswith('.log') or filename.endswith('.err') or filename.endswith('.out'):
+            return 'app'
+        
+        # Default to system logs
+        return 'system'
