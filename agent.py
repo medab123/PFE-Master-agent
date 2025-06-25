@@ -187,7 +187,7 @@ class Agent:
     def _collect_and_send_metrics(self):
         """Collect and send system metrics"""
         try:
-            metrics = self.system_collector.collect_metrics()
+            metrics = self.system_collector.collect()
             if metrics:
                 success = self.ws_client.send_message('agent.metrics', metrics)
                 if success:
@@ -234,7 +234,7 @@ class Agent:
 
         try:
             # Analyze security events
-            analysis = self.security_analyzer.analyze_events(security_events)
+            analysis = self.security_analyzer.analyze(security_events)
 
             # Prepare security data with analysis
             security_data = {
