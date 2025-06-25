@@ -127,10 +127,6 @@ class LogCollector:
         if any(name in filename for name in log_names):
             return True
 
-        # Check if it's in a logs directory
-        if 'log' in path.lower():
-            return True
-
         return False
 
     def _get_log_type(self, path):
